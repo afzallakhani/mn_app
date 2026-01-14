@@ -35,15 +35,41 @@ def calculate_mn_cushion(grade, section_size, process_risk):
 
     return round(min(max(base + section_adj + risk_adj, 0.01), 0.07), 3)
 
-def decide_mn_strategy(flp_c, flp_si, grade_data):
-    si_headroom = grade_data["Si_Max"] - flp_si
-    carbon_gap = grade_data["Target_C"] - flp_c
+# def decide_mn_strategy(flp_c, flp_si, grade_data):
+#     si_headroom = grade_data["Si_Max"] - flp_si
+#     carbon_gap = grade_data["Target_C"] - flp_c
 
-    if si_headroom < 0.12:
-        return "FEMN"
-    if carbon_gap > 0.03 and si_headroom > 0.15:
+#     if si_headroom < 0.12:
+#         return "FEMN"
+#     if carbon_gap > 0.03 and si_headroom > 0.15:
+#         return "SIMN"
+#     return "MIX"
+def decide_mn_strategy(flp_c, flp_si, grade_data):
+    """
+    Smart alloy strategy:
+    - Protect carbon max
+    - Use silicon headroom aggressively
+    - Avoid FeMn if carbon is already high
+    """
+
+    C_max = grade_data["C_Max"]
+    Si_max = grade_data["Si_Max"]
+    C_aim = grade_data["Target_C"]
+
+    carbon_margin = C_max - flp_c
+    si_headroom = Si_max - flp_si
+
+    # 🚨 Carbon already high → avoid FeMn
+    if carbon_margin < 0.03 and si_headroom > 0.08:
         return "SIMN"
+
+    # 🚨 Very low Si headroom → must use FeMn
+    if si_headroom < 0.06:
+        return "FEMN"
+
+    # Balanced case → weighted mix
     return "MIX"
+
 
 # =============================
 # MAIN CALCULATOR
@@ -109,18 +135,93 @@ def calculate_mn_and_cpc_addition(
     pure_mn_required = mn_gap * metal_qty * 10
     pure_mn_to_add = pure_mn_required / predicted_recovery
 
-    # -----------------------------
-    # INITIAL ALLOY SPLIT
-    # -----------------------------
-    femn_kg = simn_kg = 0.0
+    # if mn_strategy == "MIX":
+    # # Carbon-aware split
+    #     carbon_margin = gm["C_Max"] - flp_c
 
-    if mn_strategy == "MIX":
-        femn_kg = (pure_mn_to_add / 2) / ALLOY_MASTER["FEMN"]["Mn"]
-        simn_kg = (pure_mn_to_add / 2) / ALLOY_MASTER["SIMN"]["Mn"]
+    #     if carbon_margin < 0.04:
+    #         simn_share = 0.75   # prefer SiMn to protect carbon
+    #     else:
+    #         simn_share = 0.55   # balanced mix
+
+    #     femn_share = 1.0 - simn_share
+
+    #     femn_kg = (pure_mn_to_add * femn_share) / ALLOY_MASTER["FEMN"]["Mn"]
+    #     simn_kg = (pure_mn_to_add * simn_share) / ALLOY_MASTER["SIMN"]["Mn"]
+
+    # elif mn_strategy == "FEMN":
+    #     femn_kg = pure_mn_to_add / ALLOY_MASTER["FEMN"]["Mn"]
+
+    # else:  # SIMN
+    #     simn_kg = pure_mn_to_add / ALLOY_MASTER["SIMN"]["Mn"]
+# # -----------------------------
+# # INITIAL ALLOY SPLIT (SAFE)
+# # -----------------------------
+#     femn_kg = 0.0
+#     simn_kg = 0.0
+
+#     carbon_margin = gm["C_Max"] - flp_c
+#     si_margin = gm["Si_Max"] - flp_si
+
+#     if mn_strategy == "SIMN":
+#     # Prefer SiMn fully
+#         simn_kg = pure_mn_to_add / ALLOY_MASTER["SIMN"]["Mn"]
+
+#     elif mn_strategy == "FEMN":
+#     # Forced FeMn (low Si headroom)
+#         femn_kg = pure_mn_to_add / ALLOY_MASTER["FEMN"]["Mn"]
+
+#     else:  # MIX
+#     # ---- Carbon-aware + Si-aware split ----
+#         if carbon_margin < 0.03 and si_margin > 0.10:
+#             simn_share = 0.80
+#         elif si_margin < 0.06:
+#             simn_share = 0.30
+#         else:
+#             simn_share = 0.60
+
+#     femn_share = 1.0 - simn_share
+
+#     femn_kg = (pure_mn_to_add * femn_share) / ALLOY_MASTER["FEMN"]["Mn"]
+#     simn_kg = (pure_mn_to_add * simn_share) / ALLOY_MASTER["SIMN"]["Mn"]
+# -----------------------------
+# INITIAL ALLOY SPLIT (SAFE)
+# -----------------------------
+    femn_kg = 0.0
+    simn_kg = 0.0
+
+    carbon_margin = gm["C_Max"] - flp_c
+    si_margin = gm["Si_Max"] - flp_si
+
+# ✅ Always define simn_share
+    if mn_strategy == "SIMN":
+        simn_share = 1.0
+
     elif mn_strategy == "FEMN":
-        femn_kg = pure_mn_to_add / ALLOY_MASTER["FEMN"]["Mn"]
-    else:
-        simn_kg = pure_mn_to_add / ALLOY_MASTER["SIMN"]["Mn"]
+        simn_share = 0.0
+
+    else:  # MIX
+        if carbon_margin < 0.03 and si_margin > 0.10:
+            simn_share = 0.80
+        elif si_margin < 0.06:
+            simn_share = 0.30
+        else:
+            simn_share = 0.60
+
+    femn_share = 1.0 - simn_share
+
+# Convert pure Mn → alloy weights
+    femn_kg = (pure_mn_to_add * femn_share) / ALLOY_MASTER["FEMN"]["Mn"]
+    simn_kg = (pure_mn_to_add * simn_share) / ALLOY_MASTER["SIMN"]["Mn"]
+
+# -----------------------------
+# 🟡 Si BORDER OPTIMISATION
+# -----------------------------
+    if flp_si >= (SI_MAX - 0.03):
+    # FLP Si already near max → reduce SiMn
+        simn_kg *= 0.6
+
+    
 
     # -----------------------------
     # 🔒 Si MIN ENFORCEMENT
@@ -233,6 +334,7 @@ def calculate_mn_and_cpc_addition(
     # }
     return {
     "STATUS": "OK",
+    "from":"test",
     "FeMn_kg": round(femn_kg, 1),
     "SiMn_kg": round(simn_kg, 1),
     "CPC_kg": cpc_kg,
