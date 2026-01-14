@@ -1,6 +1,14 @@
+
+
+
 fastapi
 uvicorn
 pandas
-numpy
-scikit-learn
 joblib
+scikit-learn
+gspread
+google-auth
+google-auth-oauthlib
+python-multipart
+numpy
+python-dotenv

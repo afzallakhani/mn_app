@@ -28,45 +28,149 @@
 <input id="si" placeholder="Si %">
 <input id="p" placeholder="P %">
 
-<button onclick="calculate()">CALCULATE</button>
+<button type="button" onclick="calculate()">Calculate</button>
 
 <div id="result" class="box"></div>
+<h3>Actual Result (After Heat)</h3>
+
+<input id="actual_femn" placeholder="Actual FeMn kg">
+<input id="actual_simn" placeholder="Actual SiMn kg">
+<input id="actual_cpc" placeholder="Actual CPC kg">
+
+<input id="actual_llp_c" placeholder="Actual LLP C%">
+<input id="actual_llp_mn" placeholder="Actual LLP Mn%">
+<input id="actual_llp_si" placeholder="Actual LLP Si%">
+<input id="actual_llp_p" placeholder="Actual LLP P%">
+
+<textarea id="remarks" placeholder="Remarks"></textarea>
+
+<button onclick="submitFeedback()">Submit Feedback</button>
 
 <script>
-function calculate() {
-const API = "https://mn-app-32bb.onrender.com";
+const API = 
+  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://127.0.0.1:8000"
+    : "https://mn-app-32bb.onrender.com";
+async function calculate() {
+function getVal(id) {
+  const el = document.getElementById(id);
+  if (!el) {
+    alert("Missing field: " + id);
+    throw new Error("Missing DOM element: " + id);
+  }
+  return el.value;
+}
 
-fetch(`${API}/predict`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      grade: grade.value,
-      metal_qty: Number(metal.value),
-      section_size: Number(section.value),
-      flp_c: Number(c.value),
-      flp_mn: Number(mn.value),
-      flp_si: Number(si.value),
-      flp_p: Number(p.value),
-      process_risk: "normal"
-    })
-  })
-  .then(r => r.json())
-  .then(d => {
-    result.innerHTML = `
-      <b>Suggested Additions</b><br>
-      FeMn: ${d.FeMn_kg} kg<br>
-      SiMn: ${d.SiMn_kg} kg<br>
-      CPC: ${d.CPC_kg} kg<br><br>
+    const payload = {
+  grade: getVal("grade"),
+  metal_qty: parseFloat(getVal("metal")),
+  section_size: parseInt(getVal("section")),
 
-      <b>Expected LLP Chemistry</b><br>
-      C: ${d.Pred_LLP_C}<br>
-      Mn: ${d.Pred_LLP_Mn}<br>
-      Si: ${d.Pred_LLP_Si}<br>
-      P: ${d.Pred_LLP_P}
-    `;
-  });
+  flp_c: parseFloat(getVal("c")),
+  flp_mn: parseFloat(getVal("mn")),
+  flp_si: parseFloat(getVal("si")),
+  flp_p: parseFloat(getVal("p")),
+
+  process_risk: "normal"
+};
+
+if (
+    isNaN(payload.metal_qty) ||
+    isNaN(payload.section_size) ||
+    isNaN(payload.flp_c) ||
+    isNaN(payload.flp_mn)
+) {
+    alert("Please fill all inputs correctly");
+    return;
+}
+
+    console.log("Prediction payload:", payload);
+
+    try {
+        const res = await fetch(API + "/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            throw new Error(await res.text());
+        }
+
+        const data = await res.json();
+        window.lastPrediction = data;
+
+        document.getElementById("result").innerHTML = `
+            <b>Suggested Additions</b><br>
+            FeMn: ${data.FeMn_kg} kg<br>
+            SiMn: ${data.SiMn_kg} kg<br>
+            CPC: ${data.CPC_kg} kg<br><br>
+
+            <b>Expected LLP Chemistry</b><br>
+            C: ${data.Pred_LLP_C}<br>
+            Mn: ${data.Pred_LLP_Mn}<br>
+            Si: ${data.Pred_LLP_Si}<br>
+            P: ${data.Pred_LLP_P}
+        `;
+    } catch (err) {
+        console.error("CALCULATION FAILED:", err);
+        alert("Calculation failed – check console");
+    }
 }
 </script>
+
+<script>
+async function submitFeedback() {
+    if (!window.lastPrediction) {
+        alert("Please calculate first");
+        return;
+    }
+
+    const payload = {
+        grade: document.getElementById("grade").value,
+        metal_qty: Number(document.getElementById("metal").value),
+        section_size: Number(document.getElementById("section").value),
+
+        flp_c: Number(document.getElementById("c").value),
+        flp_mn: Number(document.getElementById("mn").value),
+        flp_si: Number(document.getElementById("si").value),
+        flp_p: Number(document.getElementById("p").value),
+
+        pred_femn: Number(window.lastPrediction.FeMn_kg),
+        pred_simn: Number(window.lastPrediction.SiMn_kg),
+        pred_cpc: Number(window.lastPrediction.CPC_kg),
+        pred_llp_c: Number(window.lastPrediction.Pred_LLP_C),
+        pred_llp_mn: Number(window.lastPrediction.Pred_LLP_Mn),
+        pred_llp_si: Number(window.lastPrediction.Pred_LLP_Si),
+
+        actual_femn: Number(document.getElementById("actual_femn").value),
+        actual_simn: Number(document.getElementById("actual_simn").value),
+        actual_cpc: Number(document.getElementById("actual_cpc").value),
+        actual_llp_c: Number(document.getElementById("actual_llp_c").value),
+        actual_llp_mn: Number(document.getElementById("actual_llp_mn").value),
+        actual_llp_si: Number(document.getElementById("actual_llp_si").value),
+        actual_llp_p: Number(document.getElementById("actual_llp_p").value),
+
+        remarks: document.getElementById("remarks").value
+    };
+console.log("Feedback payload:", payload);
+
+const res = await fetch(API+"/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+        
+    });
+console.log("Feedback response:", await res.text());
+
+    if (res.ok) {
+        alert("Feedback saved successfully");
+    } else {
+        alert("Error saving feedback");
+    }
+}
+</script>
+
 
 </body>
 </html>

@@ -1,0 +1,8 @@
+*.json
+credentials.json
+service-account.json
+google_service_account.json
+feedback_backup.csv
+__pycache__/
+.env
+jso.py
