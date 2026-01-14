@@ -156,7 +156,8 @@ def calculate_mn_and_cpc_addition(
 
     final_c_est = flp_c + (
         femn_kg * ALLOY_MASTER["FEMN"]["C"] +
-        simn_kg * ALLOY_MASTER["SIMN"]["C"]
+        simn_kg * ALLOY_MASTER["SIMN"]["C"] + 
+        cpc_kg *  CPC_MASTER["CPC"]["recovery"]
     ) / (metal_qty * 10)
 
     # -----------------------------
