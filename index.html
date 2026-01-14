@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mn + CPC Advisor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial; padding: 10px; }
+    input, select, button { width: 100%; margin: 5px 0; padding: 8px; }
+    .box { border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<h3>Mn + CPC Calculator</h3>
+
+<select id="grade">
+  <option>MS</option>
+  <option>EN8D</option>
+  <option>CK45</option>
+</select>
+
+<input id="metal" placeholder="Metal Qty (tons)">
+<input id="section" placeholder="Section Size (mm)">
+
+<h4>FLP Chemistry</h4>
+<input id="c" placeholder="C %">
+<input id="mn" placeholder="Mn %">
+<input id="si" placeholder="Si %">
+<input id="p" placeholder="P %">
+
+<button onclick="calculate()">CALCULATE</button>
+
+<div id="result" class="box"></div>
+
+<script>
+function calculate() {
+  fetch("http://192.168.1.20:8000/predict", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grade: grade.value,
+      metal_qty: Number(metal.value),
+      section_size: Number(section.value),
+      flp_c: Number(c.value),
+      flp_mn: Number(mn.value),
+      flp_si: Number(si.value),
+      flp_p: Number(p.value),
+      process_risk: "normal"
+    })
+  })
+  .then(r => r.json())
+  .then(d => {
+    result.innerHTML = `
+      <b>Suggested Additions</b><br>
+      FeMn: ${d.FeMn_kg} kg<br>
+      SiMn: ${d.SiMn_kg} kg<br>
+      CPC: ${d.CPC_kg} kg<br><br>
+
+      <b>Expected LLP Chemistry</b><br>
+      C: ${d.Pred_LLP_C}<br>
+      Mn: ${d.Pred_LLP_Mn}<br>
+      Si: ${d.Pred_LLP_Si}<br>
+      P: ${d.Pred_LLP_P}
+    `;
+  });
+}
+</script>
+
+</body>
+</html>
