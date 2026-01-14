@@ -141,12 +141,43 @@ def calculate_mn_and_cpc_addition(
             femn_kg -= mn_from_extra_simn / ALLOY_MASTER["FEMN"]["Mn"]
             femn_kg = max(femn_kg, 0)
 
+    # # -----------------------------
+    # # FINAL CHEM ESTIMATION
+    # # -----------------------------
+    # final_mn_est = flp_mn + (
+    #     (femn_kg * ALLOY_MASTER["FEMN"]["Mn"] +
+    #      simn_kg * ALLOY_MASTER["SIMN"]["Mn"]) * predicted_recovery
+    #     / (metal_qty * 10)
+    # )
+
+    # final_si_est = flp_si + (
+    #     simn_kg * ALLOY_MASTER["SIMN"]["Si"] / (metal_qty * 10)
+    # )
+
+    # final_c_est = flp_c + (
+    #     femn_kg * ALLOY_MASTER["FEMN"]["C"] +
+    #     simn_kg * ALLOY_MASTER["SIMN"]["C"]     ) / (metal_qty * 10)
+
+    
     # -----------------------------
-    # FINAL CHEM ESTIMATION
+    # CPC (FINAL)
     # -----------------------------
+    target_c_pickup = max(0, (target_c - flp_c) * metal_qty * 10)
+    carbon_from_alloys = (
+        femn_kg * ALLOY_MASTER["FEMN"]["C"] +
+        simn_kg * ALLOY_MASTER["SIMN"]["C"]
+    )
+
+    net_c_required = target_c_pickup - carbon_from_alloys
+    cpc_kg = 0.0 if net_c_required <= 0 else round(
+        net_c_required / CPC_MASTER["CPC"]["recovery"], 1
+    )
+    # -----------------------------
+# FINAL CHEM ESTIMATION (CORRECT ORDER)
+# -----------------------------
     final_mn_est = flp_mn + (
         (femn_kg * ALLOY_MASTER["FEMN"]["Mn"] +
-         simn_kg * ALLOY_MASTER["SIMN"]["Mn"]) * predicted_recovery
+        simn_kg * ALLOY_MASTER["SIMN"]["Mn"]) * predicted_recovery
         / (metal_qty * 10)
     )
 
@@ -155,11 +186,11 @@ def calculate_mn_and_cpc_addition(
     )
 
     final_c_est = flp_c + (
-        femn_kg * ALLOY_MASTER["FEMN"]["C"] +
-        simn_kg * ALLOY_MASTER["SIMN"]["C"] + 
-        cpc_kg *  CPC_MASTER["CPC"]["recovery"]
+        carbon_from_alloys +
+        (cpc_kg * CPC_MASTER["CPC"]["recovery"])
     ) / (metal_qty * 10)
 
+    
     # -----------------------------
     # 🔥 HARD SAFETY CHECKS
     # -----------------------------
@@ -183,20 +214,6 @@ def calculate_mn_and_cpc_addition(
             "MESSAGE": " / ".join(errors),
             "SUGGESTION": "Adjust strategy (more FeMn / lower target Mn / reduce Si_Min)"
         }
-
-    # -----------------------------
-    # CPC (FINAL)
-    # -----------------------------
-    target_c_pickup = max(0, (target_c - flp_c) * metal_qty * 10)
-    carbon_from_alloys = (
-        femn_kg * ALLOY_MASTER["FEMN"]["C"] +
-        simn_kg * ALLOY_MASTER["SIMN"]["C"]
-    )
-
-    net_c_required = target_c_pickup - carbon_from_alloys
-    cpc_kg = 0.0 if net_c_required <= 0 else round(
-        net_c_required / CPC_MASTER["CPC"]["recovery"], 1
-    )
 
     # -----------------------------
     # OUTPUT
