@@ -34,7 +34,9 @@
 
 <script>
 function calculate() {
-  fetch("http://192.168.1.20:8000/predict", {
+const API = "https://mn-app-32bb.onrender.com";
+
+fetch(`${API}/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
